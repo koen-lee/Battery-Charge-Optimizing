@@ -2,7 +2,15 @@
 
 public static class Program
 {
-    public static void Main(double startEnergy = 4, double maxEnergy = 5, double maxChargePower = 2, double maxDischargePower = 3)
+    /// <summary>
+    /// Generates a charge/discharge schedule
+    /// </summary>
+    /// <param name="startEnergy">Start battery level, in kWh</param>
+    /// <param name="endEnergy">Desired end battery level, in kWh</param>
+    /// <param name="maxEnergy">Maximum battery capacity, in kWh</param>
+    /// <param name="maxChargePower">Maximum charger power (DC side)</param>
+    /// <param name="maxDischargePower">Maximum discharge power (DC side)</param>
+    public static void Main(double startEnergy = 2, double endEnergy = 1, double maxEnergy = 5, double maxChargePower = 2, double maxDischargePower = 2.2)
     {
         HourPrice[] prices = HourPrice.FromAcPrices(SampleDays.Oct31_2022,
          chargeEfficiency: 0.9, dischargeEfficiency: 0.9).ToArray();
@@ -24,9 +32,10 @@ public static class Program
             // Calculate running profits
             profit = profit - prices[hour].Charge * chargeEnergies[hour] + prices[hour].Discharge * dischargeEnergies[hour];
         }
+        solver.Add(SoC >= endEnergy);
 
         solver.Maximize(profit);
-        solver.SetTimeLimit(1000);
+        solver.SetTimeLimit(1000); // just in case
         var result = solver.Solve();
         Console.WriteLine(result.ToString());
 
@@ -34,7 +43,7 @@ public static class Program
 
         var minPrice = prices.Min(p => p.Charge);
         var maxPrice = prices.Max(p => p.Charge);
-        Console.WriteLine("Hour | Price          | Charge energy   | Disch. energy   | SoC ");
+        Console.WriteLine("Hour | Price               | Charged energy       | Discharged energy    | SoC ");
         for (int hour = 0; hour < prices.Length; hour++)
         {
             Console.Write($"{hour:00}   |");
@@ -54,6 +63,7 @@ public static class Program
         string line = new string('*', (int)Math.Floor(part));
         if (part - line.Length > 0.5)
             line += '-';
+        Console.Write($"{value+0.0001:0.00} ");
         Console.Write(line);
         Console.Write(new string(' ', width - line.Length));
         Console.Write(" | ");
