@@ -40,7 +40,11 @@ public static class Program
         Console.WriteLine(result.ToString());
 
         Console.WriteLine($" Result: €{Math.Round(solver.Objective().Value(), 2)}");
+        PrintGraphs(startEnergy, maxEnergy, prices, chargeEnergies, dischargeEnergies);
+    }
 
+    private static void PrintGraphs(double lastSoC, double maxEnergy, HourPrice[] prices, Variable[] chargeEnergies, Variable[] dischargeEnergies)
+    {
         var minPrice = prices.Min(p => p.Charge);
         var maxPrice = prices.Max(p => p.Charge);
         Console.WriteLine("Hour | Price               | Charged energy       | Discharged energy    | SoC ");
@@ -50,8 +54,8 @@ public static class Program
             WriteGraphLine(prices[hour].Charge, minPrice, maxPrice);
             WriteGraphLine(chargeEnergies[hour].SolutionValue(), 0, maxEnergy);
             WriteGraphLine(dischargeEnergies[hour].SolutionValue(), 0, maxEnergy);
-            startEnergy += chargeEnergies[hour].SolutionValue() - dischargeEnergies[hour].SolutionValue();
-            WriteGraphLine(startEnergy, 0, maxEnergy);
+            lastSoC += chargeEnergies[hour].SolutionValue() - dischargeEnergies[hour].SolutionValue();
+            WriteGraphLine(lastSoC, 0, maxEnergy);
             Console.WriteLine();
         }
     }
