@@ -1,4 +1,6 @@
-﻿public static class SampleDays
+﻿using System.Text.Json;
+
+public static class SampleDays
 {
     public static double[] Oct31_2022 = new double[] {
         0.13,
@@ -52,4 +54,16 @@
         0.10489,
         0.09490
     };
+
+    public static PricePoint[] Raw2022 => JsonSerializer.Deserialize<PricePoints>(File.OpenRead("energyprices2022.json")).Prices;
+}
+
+public class PricePoints
+{
+    public PricePoint[] Prices { get; set; }
+}
+public struct PricePoint
+{
+    public DateTimeOffset readingDate { get; init; }
+    public double price { get; init; }
 }

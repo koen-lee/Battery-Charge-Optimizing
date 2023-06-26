@@ -1,4 +1,5 @@
 ﻿using Google.OrTools.LinearSolver;
+using System.Diagnostics;
 using System.Text;
 
 public static class Program
@@ -22,14 +23,51 @@ public static class Program
                             double roundtripEfficiencyHalfpower = 0.9
         )
     {
-        var prices = SampleDays.Jun07_2023;
+        var stopwatch = Stopwatch.StartNew();
+        var allprices = SampleDays.Raw2022;
+        var prices = new PricePoint[24];
+        int start = 0;
+        int delta = 12; // new prices are published at 12:00
+        double totalProfit = 0;
+        while (true)
+        {
+            Array.Copy(allprices, start, prices, 0, prices.Length);
+            var startMoment = prices[0].readingDate;
+            var dayprices = prices.Select(p => p.price).ToArray();
+            OptimizedState[] hours = Optimize(startEnergy,
+                                              endEnergy,
+                                              maxEnergy,
+                                              maxChargePower,
+                                              maxDischargePower,
+                                              roundtripEfficiencyFullpower,
+                                              roundtripEfficiencyHalfpower,
+                                              dayprices,
+                                              startMoment);
+            var day = hours.Take(delta).ToArray();
+            PrintGraphs(day, maxEnergy);
+            var profitToday = day.Sum(h => -h.Cost);
+            Console.WriteLine($" == Profit subtotal {profitToday:0.00}");
+            totalProfit += profitToday;
+            start += delta;
+            delta = 24;
+            var nextStretch = Math.Min(36, allprices.Length - start);
+            if (nextStretch <= 0) break;
+            prices = new PricePoint[nextStretch];
+            startEnergy = day.Last().EndSoC;
+        }
+
+        Console.WriteLine($" === Profit total {totalProfit:0.00}");
+        Console.WriteLine($" Elapsed: {stopwatch.Elapsed}");
+    }
+
+    private static OptimizedState[] Optimize(double startEnergy, double endEnergy, double maxEnergy, double maxChargePower, double maxDischargePower, double roundtripEfficiencyFullpower, double roundtripEfficiencyHalfpower, double[] prices, DateTimeOffset startMoment)
+    {
         HourPrice[] fullPowerPrices = HourPrice.FromAcPrices(prices,
          chargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower)).ToArray();
         HourPrice[] halfPowerPrices = HourPrice.FromAcPrices(prices,
              chargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower)).ToArray();
 
-        Solver solver = Solver.CreateSolver("GLOP");
-
+        var solver = Solver.CreateSolver("GLOP");
         var chargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxChargePower, "chargeFullpower");
         var dischargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxDischargePower, "dischargeFullpower");
         var chargeHalfpower = solver.MakeNumVarArray(prices.Length, 0, 0.5 * maxChargePower, "chargeHalfpower");
@@ -67,7 +105,6 @@ public static class Program
         solver.SetTimeLimit(1000); // just in case
         var result = solver.Solve();
         Console.WriteLine(result.ToString());
-
         var hours = new PartialSolution
         {
             Prices = prices,
@@ -75,11 +112,8 @@ public static class Program
             Costs = Evaluate(costs),
             Charge = Evaluate(charge),
             Discharge = Evaluate(discharge)
-        }.ToHourStates(DateTimeOffset.MinValue);
-
-        Console.WriteLine($" Result: €{Math.Round(solver.Objective().Value(), 4)}");
-
-        PrintGraphs(hours, maxEnergy);
+        }.ToHourStates(startMoment);
+        return hours;
     }
 
     private static double[] Evaluate(LinearExpr[] exprs)
