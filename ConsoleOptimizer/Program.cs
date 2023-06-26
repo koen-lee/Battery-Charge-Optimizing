@@ -1,4 +1,5 @@
 ﻿using Google.OrTools.LinearSolver;
+using System.Text;
 
 public static class Program
 {
@@ -17,39 +18,48 @@ public static class Program
                             double maxEnergy = 5,
                             double maxChargePower = 2.2,
                             double maxDischargePower = 1.7,
-                            double roundtripEfficiencyFullpower = 0.9,
+                            double roundtripEfficiencyFullpower = 0.81,
                             double roundtripEfficiencyHalfpower = 0.9
         )
     {
-        HourPrice[] fullPowerPrices = HourPrice.FromAcPrices(SampleDays.Jun07_2023,
+        var prices = SampleDays.Jun07_2023;
+        HourPrice[] fullPowerPrices = HourPrice.FromAcPrices(prices,
          chargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower)).ToArray();
-        HourPrice[] halfPowerPrices = HourPrice.FromAcPrices(SampleDays.Jun07_2023,
+        HourPrice[] halfPowerPrices = HourPrice.FromAcPrices(prices,
              chargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower)).ToArray();
 
         Solver solver = Solver.CreateSolver("GLOP");
 
-        var chargeFullpower = solver.MakeNumVarArray(fullPowerPrices.Length, 0, maxChargePower);
-        var dischargeFullpower = solver.MakeNumVarArray(fullPowerPrices.Length, 0, maxDischargePower);
-        var chargeHalfpower = solver.MakeNumVarArray(fullPowerPrices.Length, 0, 0.5 * maxChargePower);
-        var dischargeHalfpower = solver.MakeNumVarArray(fullPowerPrices.Length, 0, 0.5 * maxDischargePower);
+        var chargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxChargePower, "chargeFullpower");
+        var dischargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxDischargePower, "dischargeFullpower");
+        var chargeHalfpower = solver.MakeNumVarArray(prices.Length, 0, 0.5 * maxChargePower, "chargeHalfpower");
+        var dischargeHalfpower = solver.MakeNumVarArray(prices.Length, 0, 0.5 * maxDischargePower, "dischargeHalfpower");
 
+        // Growing expressions
         LinearExpr SoC = new LinearExpr() + startEnergy;
         LinearExpr profit = new();
-        for (int hour = 0; hour < fullPowerPrices.Length; hour++)
+        // hourly state
+        LinearExpr[] charge = new LinearExpr[prices.Length];
+        LinearExpr[] discharge = new LinearExpr[prices.Length];
+        LinearExpr[] costs = new LinearExpr[prices.Length];
+        LinearExpr[] SoCs = new LinearExpr[prices.Length];
+        for (int hour = 0; hour < prices.Length; hour++)
         {
             // Make sure total power is limited
-            solver.Add(chargeFullpower[hour] + chargeHalfpower[hour] <= maxChargePower);
-            solver.Add(dischargeFullpower[hour] + dischargeHalfpower[hour] <= maxDischargePower);
+            charge[hour] = chargeFullpower[hour] + chargeHalfpower[hour];
+            discharge[hour] = dischargeFullpower[hour] + dischargeHalfpower[hour];
+            solver.Add(charge[hour] <= maxChargePower);
+            solver.Add(discharge[hour] <= maxDischargePower);
 
+            SoC = SoC + charge[hour] - discharge[hour];
+            SoCs[hour] = SoC;
             // Add charge until full constraints
-            solver.Add(SoC + chargeFullpower[hour] + chargeHalfpower[hour] <= maxEnergy);
-            solver.Add(SoC - dischargeFullpower[hour] - dischargeHalfpower[hour] >= 0);
-            SoC = SoC + chargeFullpower[hour] - dischargeFullpower[hour];
-            SoC = SoC + chargeHalfpower[hour] - dischargeHalfpower[hour];
-
+            solver.Add(SoC <= maxEnergy);
+            solver.Add(SoC >= 0);
             // Calculate running profits
-            profit = profit - fullPowerPrices[hour].Charge * chargeFullpower[hour] + fullPowerPrices[hour].Discharge * dischargeFullpower[hour];
-            profit = profit - halfPowerPrices[hour].Charge * chargeHalfpower[hour] + halfPowerPrices[hour].Discharge * dischargeHalfpower[hour];
+            costs[hour] = fullPowerPrices[hour].Charge * chargeFullpower[hour] + halfPowerPrices[hour].Charge * chargeHalfpower[hour]
+                - fullPowerPrices[hour].Discharge * dischargeFullpower[hour] - halfPowerPrices[hour].Discharge * dischargeHalfpower[hour];
+            profit -= costs[hour];
         }
         solver.Add(SoC >= endEnergy);
 
@@ -58,24 +68,37 @@ public static class Program
         var result = solver.Solve();
         Console.WriteLine(result.ToString());
 
+        var hours = new PartialSolution
+        {
+            Prices = prices,
+            SoCs = Evaluate(SoCs),
+            Costs = Evaluate(costs),
+            Charge = Evaluate(charge),
+            Discharge = Evaluate(discharge)
+        }.ToHourStates(DateTimeOffset.MinValue);
+
         Console.WriteLine($" Result: €{Math.Round(solver.Objective().Value(), 4)}");
-        PrintGraphs(startEnergy, maxEnergy, fullPowerPrices, chargeFullpower, dischargeFullpower, chargeHalfpower, dischargeHalfpower);
+
+        PrintGraphs(hours, maxEnergy);
     }
 
-    private static void PrintGraphs(double lastSoC, double maxEnergy, HourPrice[] prices, Variable[] chargeEnergies, Variable[] dischargeEnergies, Variable[] chargeHalfpower, Variable[] dischargeHalfpower)
+    private static double[] Evaluate(LinearExpr[] exprs)
     {
-        var minPrice = prices.Min(p => p.Charge);
-        var maxPrice = prices.Max(p => p.Charge);
-        Console.WriteLine("Hour | Price               | Charged energy       | Discharged energy    | SoC ");
-        for (int hour = 0; hour < prices.Length; hour++)
+        return exprs.Select(e => e.EvaluateSolution()).ToArray();
+    }
+
+    private static void PrintGraphs(IEnumerable<OptimizedState> hours, double maxEnergy)
+    {
+        var minPrice = hours.Min(p => p.GridPrice);
+        var maxPrice = hours.Max(p => p.GridPrice);
+        Console.WriteLine("Timestamp  | Price               | Charged energy       | Discharged energy    | SoC ");
+        foreach (var state in hours)
         {
-            Console.Write($"{hour:00}   |");
-            WriteGraphLine(prices[hour].Charge, minPrice, maxPrice);
-            WriteGraphLine(chargeEnergies[hour].SolutionValue() + chargeHalfpower[hour].SolutionValue(), 0, maxEnergy);
-            WriteGraphLine(dischargeEnergies[hour].SolutionValue() + dischargeHalfpower[hour].SolutionValue(), 0, maxEnergy);
-            lastSoC += chargeEnergies[hour].SolutionValue() - dischargeEnergies[hour].SolutionValue();
-            lastSoC += chargeHalfpower[hour].SolutionValue() - dischargeHalfpower[hour].SolutionValue();
-            WriteGraphLine(lastSoC, 0, maxEnergy);
+            Console.Write($"{state.Timestamp:MMddTHH:mm} |");
+            WriteGraphLine(state.GridPrice, minPrice, maxPrice);
+            WriteGraphLine(state.Charge, 0, maxEnergy);
+            WriteGraphLine(state.Discharge, 0, maxEnergy);
+            WriteGraphLine(state.EndSoC, 0, maxEnergy);
             Console.WriteLine();
         }
     }
@@ -83,13 +106,12 @@ public static class Program
     static void WriteGraphLine(double value, double min, double max)
     {
         int width = 15;
-        double part = width * ((value - min) / (max - min));
-        string line = new string('*', (int)Math.Round(part));
-        if (part - line.Length > 0.5)
-            line += '-';
-        Console.Write($"{value + 0.0001:0.00} ");
+        int part = (int)Math.Round(width * ((value - min) / (max - min)));
+        var line = new StringBuilder(width + 3);
+        line.Append($"{value + 0.0001:0.00} ");
+        line.Append('*', part);
+        line.Append(' ', width - part);
+        line.Append(" | ");
         Console.Write(line);
-        Console.Write(new string(' ', width - line.Length));
-        Console.Write(" | ");
     }
 }
