@@ -69,23 +69,22 @@ public static class Program
         double[] charge = new double[prices.Length];
         double[] discharge = new double[prices.Length];
         var orderedPrices = prices.Select((price, index) => (price, index)).OrderBy(x => x.price).Select(x => x.index).ToArray();
-
+        var cheapestHours = orderedPrices[0..2];
+        var expensiveHours = orderedPrices[^4..^0];
         for (int hour = 0; hour < prices.Length; hour++)
         {
-            if (fullPowerPrices[orderedPrices[0]].Charge < fullPowerPrices[orderedPrices[^0]].Discharge)
+            if (cheapestHours.Contains(hour))
             {
-                if (orderedPrices[0..2].Contains(hour))
-                {
-                    charge[hour] = Math.Min(maxChargePower, maxEnergy - startEnergy);
-                    costs[hour] = fullPowerPrices[hour].Charge * charge[hour];
-                }
-                else if (orderedPrices[^4..^0].Contains(hour))
-                {
-                    discharge[hour] = Math.Min(maxDischargePower, startEnergy);
-                    costs[hour] = -fullPowerPrices[hour].Discharge * discharge[hour];
-                }
-                startEnergy += charge[hour] - discharge[hour];
+                charge[hour] = Math.Min(maxChargePower, maxEnergy - startEnergy);
+                costs[hour] = fullPowerPrices[hour].Charge * charge[hour];
             }
+            else if (expensiveHours.Contains(hour))
+            {
+                discharge[hour] = Math.Min(maxDischargePower, startEnergy);
+                costs[hour] = -fullPowerPrices[hour].Discharge * discharge[hour];
+            }
+            startEnergy += charge[hour] - discharge[hour];
+
             SoCs[hour] = startEnergy;
         }
         var hours = new PartialSolution
