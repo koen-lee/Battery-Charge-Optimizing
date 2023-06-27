@@ -55,7 +55,18 @@ public static class SampleDays
         0.09490
     };
 
-    public static PricePoint[] Raw2022 => JsonSerializer.Deserialize<PricePoints>(File.OpenRead("energyprices2022.json")).Prices;
+    // from unknown source
+    public static Tariff[] Raw2022 => JsonSerializer.Deserialize<PricePoints>(File.OpenRead("energyprices2022.json")).Prices
+        .Select(p => new Tariff { TariffUsage = p.price, Timestamp = p.readingDate }).ToArray();
+
+    // result of curl "https://mijn.easyenergy.com/nl/api/tariff/getapxtariffs?startTimestamp=2023-01-01T00%3A00%3A00.000Z&endTimestamp=2023-06-27T00%3A00%3A00.000Z" -o 2023_firsthalf.json
+    public static Tariff[] RawHalf2023 = JsonSerializer.Deserialize<Tariff[]>(File.OpenRead("energyprices2023_firsthalf.json"));
+}
+
+public struct Tariff
+{
+    public DateTimeOffset Timestamp { get; init; }
+    public double TariffUsage { get; init; }
 }
 
 public class PricePoints

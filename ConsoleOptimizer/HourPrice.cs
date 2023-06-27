@@ -19,6 +19,6 @@
     public static IEnumerable<HourPrice> FromAcPrices(IEnumerable<double> acPrices, double chargeEfficiency, double dischargeEfficiency)
     {
         foreach (var hourPrice in acPrices)
-            yield return new HourPrice(hourPrice, chargeEfficiency, dischargeEfficiency);
+            yield return new HourPrice((hourPrice + 0.15) * 1.21, chargeEfficiency, dischargeEfficiency);
     }
 }

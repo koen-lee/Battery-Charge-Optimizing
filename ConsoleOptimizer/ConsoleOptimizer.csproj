@@ -9,9 +9,13 @@
 
   <ItemGroup>
     <None Remove="energyprices2022.json" />
+    <None Remove="energyprices2023_firsthalf.json" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="energyprices2023_firsthalf.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="energyprices2022.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
