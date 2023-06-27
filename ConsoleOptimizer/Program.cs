@@ -17,8 +17,8 @@ public static class Program
     public static void Main(double startEnergy = 0,
                             double endEnergy = 0,
                             double maxEnergy = 5,
-                            double maxChargePower = 2.2,
-                            double maxDischargePower = 1.7,
+                            double maxChargePower = 1.8,
+                            double maxDischargePower = 0.9,
                             double roundtripEfficiencyFullpower = 0.81,
                             double roundtripEfficiencyHalfpower = 0.9
         )
@@ -27,7 +27,7 @@ public static class Program
         var allprices = SampleDays.Raw2022;
         var prices = new PricePoint[24];
         int start = 0;
-        int delta = 12; // new prices are published at 12:00
+        int delta = 24; // new prices are published at 12:00
         double totalProfit = 0;
         while (true)
         {
@@ -50,7 +50,7 @@ public static class Program
             totalProfit += profitToday;
             start += delta;
             delta = 24;
-            var nextStretch = Math.Min(36, allprices.Length - start);
+            var nextStretch = Math.Min(24, allprices.Length - start);
             if (nextStretch <= 0) break;
             prices = new PricePoint[nextStretch];
             startEnergy = day.Last().EndSoC;
@@ -63,55 +63,38 @@ public static class Program
     private static OptimizedState[] Optimize(double startEnergy, double endEnergy, double maxEnergy, double maxChargePower, double maxDischargePower, double roundtripEfficiencyFullpower, double roundtripEfficiencyHalfpower, double[] prices, DateTimeOffset startMoment)
     {
         HourPrice[] fullPowerPrices = HourPrice.FromAcPrices(prices,
-         chargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyFullpower)).ToArray();
-        HourPrice[] halfPowerPrices = HourPrice.FromAcPrices(prices,
-             chargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower), dischargeEfficiency: Math.Sqrt(roundtripEfficiencyHalfpower)).ToArray();
+         chargeEfficiency: 0.9, dischargeEfficiency: 0.95).ToArray();
+        double[] SoCs = new double[prices.Length];
+        double[] costs = new double[prices.Length];
+        double[] charge = new double[prices.Length];
+        double[] discharge = new double[prices.Length];
+        var orderedPrices = prices.Select((price, index) => (price, index)).OrderBy(x => x.price).Select(x => x.index).ToArray();
 
-        var solver = Solver.CreateSolver("GLOP");
-        var chargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxChargePower, "chargeFullpower");
-        var dischargeFullpower = solver.MakeNumVarArray(prices.Length, 0, maxDischargePower, "dischargeFullpower");
-        var chargeHalfpower = solver.MakeNumVarArray(prices.Length, 0, 0.5 * maxChargePower, "chargeHalfpower");
-        var dischargeHalfpower = solver.MakeNumVarArray(prices.Length, 0, 0.5 * maxDischargePower, "dischargeHalfpower");
-
-        // Growing expressions
-        LinearExpr SoC = new LinearExpr() + startEnergy;
-        LinearExpr profit = new();
-        // hourly state
-        LinearExpr[] charge = new LinearExpr[prices.Length];
-        LinearExpr[] discharge = new LinearExpr[prices.Length];
-        LinearExpr[] costs = new LinearExpr[prices.Length];
-        LinearExpr[] SoCs = new LinearExpr[prices.Length];
         for (int hour = 0; hour < prices.Length; hour++)
         {
-            // Make sure total power is limited
-            charge[hour] = chargeFullpower[hour] + chargeHalfpower[hour];
-            discharge[hour] = dischargeFullpower[hour] + dischargeHalfpower[hour];
-            solver.Add(charge[hour] <= maxChargePower);
-            solver.Add(discharge[hour] <= maxDischargePower);
-
-            SoC = SoC + charge[hour] - discharge[hour];
-            SoCs[hour] = SoC;
-            // Add charge until full constraints
-            solver.Add(SoC <= maxEnergy);
-            solver.Add(SoC >= 0);
-            // Calculate running profits
-            costs[hour] = fullPowerPrices[hour].Charge * chargeFullpower[hour] + halfPowerPrices[hour].Charge * chargeHalfpower[hour]
-                - fullPowerPrices[hour].Discharge * dischargeFullpower[hour] - halfPowerPrices[hour].Discharge * dischargeHalfpower[hour];
-            profit -= costs[hour];
+            if (fullPowerPrices[orderedPrices[0]].Charge < fullPowerPrices[orderedPrices[^0]].Discharge)
+            {
+                if (orderedPrices[0..2].Contains(hour))
+                {
+                    charge[hour] = Math.Min(maxChargePower, maxEnergy - startEnergy);
+                    costs[hour] = fullPowerPrices[hour].Charge * charge[hour];
+                }
+                else if (orderedPrices[^4..^0].Contains(hour))
+                {
+                    discharge[hour] = Math.Min(maxDischargePower, startEnergy);
+                    costs[hour] = -fullPowerPrices[hour].Discharge * discharge[hour];
+                }
+                startEnergy += charge[hour] - discharge[hour];
+            }
+            SoCs[hour] = startEnergy;
         }
-        solver.Add(SoC >= endEnergy);
-
-        solver.Maximize(profit);
-        solver.SetTimeLimit(1000); // just in case
-        var result = solver.Solve();
-        Console.WriteLine(result.ToString());
         var hours = new PartialSolution
         {
             Prices = prices,
-            SoCs = Evaluate(SoCs),
-            Costs = Evaluate(costs),
-            Charge = Evaluate(charge),
-            Discharge = Evaluate(discharge)
+            SoCs = SoCs,
+            Costs = costs,
+            Charge = charge,
+            Discharge = discharge
         }.ToHourStates(startMoment);
         return hours;
     }
