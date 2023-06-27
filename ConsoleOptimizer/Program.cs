@@ -24,16 +24,16 @@ public static class Program
         )
     {
         var stopwatch = Stopwatch.StartNew();
-        var allprices = SampleDays.Raw2022;
-        var prices = new PricePoint[24];
+        var allprices = SampleDays.RawHalf2023;
+        var prices = new Tariff[24];
         int start = 0;
         int delta = 24; // new prices are published at 12:00
         double totalProfit = 0;
         while (true)
         {
             Array.Copy(allprices, start, prices, 0, prices.Length);
-            var startMoment = prices[0].readingDate;
-            var dayprices = prices.Select(p => p.price).ToArray();
+            var startMoment = prices[0].Timestamp;
+            var dayprices = prices.Select(p => p.TariffUsage).ToArray();
             OptimizedState[] hours = Optimize(startEnergy,
                                               endEnergy,
                                               maxEnergy,
@@ -52,7 +52,7 @@ public static class Program
             delta = 24;
             var nextStretch = Math.Min(24, allprices.Length - start);
             if (nextStretch <= 0) break;
-            prices = new PricePoint[nextStretch];
+            prices = new Tariff[nextStretch];
             startEnergy = day.Last().EndSoC;
         }
 
