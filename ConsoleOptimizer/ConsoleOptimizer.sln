@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.32328.378
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleOptimizer", "ConsoleOptimizer.csproj", "{81C0150F-CCF0-481F-B05F-A2ECBEF7223D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleOptimizer", "ConsoleOptimizer.csproj", "{81C0150F-CCF0-481F-B05F-A2ECBEF7223D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OptimizerTests", "..\OptimizerTests\OptimizerTests.csproj", "{7459E600-B4EE-4FBD-B503-DD409C0FC96A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{81C0150F-CCF0-481F-B05F-A2ECBEF7223D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81C0150F-CCF0-481F-B05F-A2ECBEF7223D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{81C0150F-CCF0-481F-B05F-A2ECBEF7223D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7459E600-B4EE-4FBD-B503-DD409C0FC96A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7459E600-B4EE-4FBD-B503-DD409C0FC96A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7459E600-B4EE-4FBD-B503-DD409C0FC96A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7459E600-B4EE-4FBD-B503-DD409C0FC96A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

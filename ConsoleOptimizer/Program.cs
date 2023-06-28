@@ -118,7 +118,7 @@ public static class Program
 
     private static double[] Evaluate(LinearExpr[] exprs)
     {
-        return exprs.Select(e => e.EvaluateSolution()).ToArray();
+        return exprs.Select(e => e.SolutionValue()).ToArray();
     }
 
     private static void PrintGraphs(IEnumerable<OptimizedState> hours, double maxEnergy)

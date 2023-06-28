@@ -11,7 +11,7 @@ public static class LinearExprExtensions
     /// <param name="expr">The expression to evaluate</param>
     /// <returns>The calculated result, using SolutionValue() for variables.</returns>
     /// <exception cref="NotImplementedException">in case the private parts of the lib change</exception>
-    public static double EvaluateSolution(this LinearExpr expr)
+    public static double SolutionValue(this LinearExpr expr)
     {
         switch (expr.GetType().Name)
         {
@@ -36,7 +36,7 @@ public static class LinearExprExtensions
         if (Sum_right_ == null) Sum_right_ = expr.GetType().GetField("right_", privateField);
         var left = (LinearExpr)Sum_left_.GetValue(expr);
         var right = (LinearExpr)Sum_right_.GetValue(expr);
-        return EvaluateSolution(left) + EvaluateSolution(right);
+        return SolutionValue(left) + SolutionValue(right);
     }
 
     private static double EvaluateProductCst(LinearExpr expr)
@@ -46,7 +46,7 @@ public static class LinearExprExtensions
         if (ProductCst_expr_ == null) ProductCst_expr_ = expr.GetType().GetField("expr_", privateField);
         var coeff_ = (double)ProductCst_coeff_.GetValue(expr);
         var expr_ = (LinearExpr)ProductCst_expr_.GetValue(expr);
-        return coeff_ * EvaluateSolution(expr_);
+        return coeff_ * SolutionValue(expr_);
     }
 
     private static double EvaluateSumCst(LinearExpr expr)
@@ -55,7 +55,7 @@ public static class LinearExprExtensions
         if (SumCst_expr_ == null) SumCst_expr_ = expr.GetType().GetField("expr_", privateField);
         var coeff_ = (double)SumCst_coeff_.GetValue(expr);
         var expr_ = (LinearExpr)SumCst_expr_.GetValue(expr);
-        return coeff_ + EvaluateSolution(expr_);
+        return coeff_ + SolutionValue(expr_);
     }
 
     private static double EvaluateVarWrapper(LinearExpr expr)
