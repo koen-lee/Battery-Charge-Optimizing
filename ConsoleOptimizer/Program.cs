@@ -17,6 +17,7 @@ public static class Program
                             double maxEnergy = 5,
                             string chargemap = "1.1:0.95;1.65:0.93;2.2:0.90",
                             string dischargemap = "0.85:0.95;1.2:0.93;1.7:0.92"
+                            bool verbose = false
         )
     {
         var thechargemap = chargemap.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(EfficiencyMap.FromSimpleString).ToArray();
@@ -28,6 +29,7 @@ public static class Program
         int start = 0;
         int delta = 12; // new prices are published at 12:00
         double totalProfit = 0;
+        double totalCycles = 0;
         while (true)
         {
             Array.Copy(allprices, start, prices, 0, prices.Length);
@@ -41,10 +43,13 @@ public static class Program
                                               dayprices,
                                               startMoment);
             var day = hours.Take(delta).ToArray();
-            PrintGraphs(day, maxEnergy);
+            if (verbose)
+                PrintGraphs(day, maxEnergy);
             var profitToday = day.Sum(h => -h.Cost);
-            Console.WriteLine($" == Profit subtotal {profitToday:0.00}");
+            var cycles = day.Sum(h => h.Charge) / maxEnergy;
+            Console.WriteLine($"{startMoment:yyyy-MM-dd};{profitToday, 5:0.00};{cycles:0.00}:");
             totalProfit += profitToday;
+            totalCycles += cycles;
             start += delta;
             delta = 24;
             var nextStretch = Math.Min(36, allprices.Length - start);
@@ -53,7 +58,7 @@ public static class Program
             startEnergy = day.Last().EndSoC;
         }
 
-        Console.WriteLine($" === Profit total {totalProfit:0.00}");
+        Console.WriteLine($" === Profit total {totalProfit:0.00} in {totalCycles:0.00} cycles");
         Console.WriteLine($" Elapsed: {stopwatch.Elapsed}");
     }
 
@@ -108,7 +113,6 @@ public static class Program
         solver.Maximize(profit);
         solver.SetTimeLimit(1000); // just in case
         var result = solver.Solve();
-        Console.WriteLine(result.ToString());
         var hours = new PartialSolution
         {
             Prices = prices,
@@ -129,7 +133,7 @@ public static class Program
     {
         var minPrice = hours.Min(p => p.GridPrice);
         var maxPrice = hours.Max(p => p.GridPrice);
-        Console.WriteLine("Timestamp  | Price               | Charged energy       | Discharged energy    | SoC ");
+        Console.WriteLine("Timestamp  | Price                | Charged energy       | Discharged energy    | SoC ");
         foreach (var state in hours)
         {
             Console.Write($"{state.Timestamp:MMddTHH:mm} |");
@@ -146,10 +150,10 @@ public static class Program
         int width = 15;
         int part = (int)Math.Round(width * ((value - min) / (max - min)));
         var line = new StringBuilder(width + 3);
-        line.Append($"{value + 0.0001:0.00} ");
+        line.Append($"{value + 0.0001,5:0.00} ");
         line.Append('*', part);
         line.Append(' ', width - part);
-        line.Append(" | ");
+        line.Append(" |");
         Console.Write(line);
     }
 
