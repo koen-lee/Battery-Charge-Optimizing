@@ -25,9 +25,33 @@ public static class LinearExprExtensions
                 return EvaluateSumCst(expr);
             case "VarWrapper":
                 return EvaluateVarWrapper(expr);
+            case "SumArray":
+                return EvaluateSumArray(expr);
+            case "SumVarArray":
+                return EvaluateSumVarArray(expr);
             default:
                 throw new NotImplementedException(expr.GetType().Name);
         }
+    }
+
+    private static double EvaluateSumVarArray(LinearExpr expr)
+    {
+        if (SumVarArray_array_ == null) SumVarArray_array_ = expr.GetType().GetField("array_", privateField);
+        var array = (Variable[])SumVarArray_array_.GetValue(expr);
+        double sum = 0;
+        foreach (var item in array)
+            sum += item.SolutionValue();
+        return sum;
+    }
+
+    private static double EvaluateSumArray(LinearExpr expr)
+    {
+        if (SumArray_array_ == null) SumArray_array_ = expr.GetType().GetField("array_", privateField);
+        var array = (LinearExpr[])SumArray_array_.GetValue(expr);
+        double sum = 0;
+        foreach (var item in array)
+            sum += item.SolutionValue();
+        return sum;
     }
 
     private static double EvaluateSum(LinearExpr expr)
@@ -73,4 +97,6 @@ public static class LinearExprExtensions
     private static FieldInfo ProductCst_coeff_;
     private static FieldInfo Sum_left_;
     private static FieldInfo Sum_right_;
+    private static FieldInfo SumArray_array_;
+    private static FieldInfo SumVarArray_array_;
 }
