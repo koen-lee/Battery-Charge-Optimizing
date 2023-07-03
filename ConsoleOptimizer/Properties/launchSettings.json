@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ConsoleOptimizer": {
+      "commandName": "Project",
+      "commandLineArgs": "--max-energy 15 --chargemap \"0.4:0.927;1:0.928;1.77:0.925;2.37:0.919;3:0.907;3.76:0.886\" --dischargemap \"1.1:0.962;2.188:0.948;3.12:0.927;4.126:0.908;5.12:0.886\""
+    }
+  }
+}

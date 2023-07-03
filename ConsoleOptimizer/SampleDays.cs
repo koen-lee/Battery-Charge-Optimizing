@@ -61,6 +61,7 @@ public static class SampleDays
 
     // result of curl "https://mijn.easyenergy.com/nl/api/tariff/getapxtariffs?startTimestamp=2023-01-01T00%3A00%3A00.000Z&endTimestamp=2023-06-27T00%3A00%3A00.000Z" -o 2023_firsthalf.json
     public static Tariff[] RawHalf2023 = JsonSerializer.Deserialize<Tariff[]>(File.OpenRead("energyprices2023_firsthalf.json"));
+    public static readonly Stream Sample = File.OpenRead("energyprices2023_firsthalf.json");
 }
 
 public struct Tariff

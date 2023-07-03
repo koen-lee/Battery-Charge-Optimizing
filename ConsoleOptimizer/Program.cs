@@ -1,17 +1,23 @@
 ﻿using Google.OrTools.LinearSolver;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 public static class Program
 {
     /// <summary>
-    /// Generates a charge/discharge schedule
+    /// Generates a charge/discharge schedule, based on pricin
     /// </summary>
     /// <param name="startEnergy">Start battery level, in kWh</param>
     /// <param name="endEnergy">Desired end battery level, in kWh</param>
     /// <param name="maxEnergy">Maximum battery capacity, in kWh</param>
-    /// <param name="chargemap">List of power:efficiency pairs for charging, ;-separated, in kW/fraction</param>
-    /// <param name="dischargemap">List of power:efficiency pairs for discharging, ;-separated, in kW/fraction.</param>
+    /// <param name="chargemap">List of power:efficiency pairs for charging, ;-separated, in kW/fraction.
+    /// Sessy:           1.1:0.95;1.65:0.93;2.2:0.90
+    /// Victron MPII 5k: 1:0.927;1:0.928;1.77:0.925;2.37:0.919;3:0.907;3.76:0.886</param>
+    /// <param name="dischargemap">List of power:efficiency pairs for discharging, ;-separated, in kW/fraction.
+    /// Sessy:           0.85:0.95;1.2:0.93;1.7:0.91
+    /// Victron MPII 5k: 1.1:0.962;2.188:0.948;3.12:0.927;4.126:0.908;5.12:0.886</param>
+    /// <param name="verbose">When set, include detailed info</param>
     public static void Main(double startEnergy = 0,
                             double endEnergy = 0,
                             double maxEnergy = 5,
@@ -24,7 +30,7 @@ public static class Program
         var thedischargemap = dischargemap.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(EfficiencyMap.FromSimpleString).ToArray();
 
         var stopwatch = Stopwatch.StartNew();
-        var allprices = SampleDays.RawHalf2023;
+        var allprices = JsonSerializer.Deserialize<Tariff[]>(sampledata ? SampleDays.Sample : Console.OpenStandardInput());
         var prices = new Tariff[24];
         int start = 0;
         int delta = 12; // new prices are published at 12:00
